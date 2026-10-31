@@ -1,0 +1,16 @@
+{
+  "name": "hilma-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Hilma MCP -palvelin Cloudflare Workersissa: julkiset hankinnat hankintailmoitukset.fi-palvelusta omaan käyttöön.",
+  "license": "MIT",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node test/smoke.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

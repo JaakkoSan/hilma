@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hilma-mcp",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-01",
+  "observability": { "enabled": true },
+  // Pyyntöjen sisältöä ei tallenneta mihinkään. Välimuisti: Cloudflaren Cache API.
+  // Pakolliset salaisuudet (Settings → Variables and Secrets tai wrangler secret put):
+  //   HILMA_API_KEY    Hilman avp-read-tilauksen avain (hns-hilma-prod-apim.developer.azure-api.net)
+  //   MCP_PATH_SECRET  vähintään 16 merkkiä; liittimen osoite on /mcp/<salaisuus>
+  "workers_dev": true,
+  // Käyttörajoitus työkalukutsuille (ks. src/index.js). period: 10 tai 60 sekuntia.
+  "ratelimits": [
+    { "name": "SESSION_LIMITER", "namespace_id": "1401", "simple": { "limit": 30, "period": 60 } },
+    { "name": "IP_LIMITER", "namespace_id": "1402", "simple": { "limit": 120, "period": 60 } }
+  ]
+}
