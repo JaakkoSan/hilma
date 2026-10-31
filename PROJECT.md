@@ -5,7 +5,7 @@ Oma Claude-liitin julkisille hankinnoille Hilmasta. Tehty 31.10.2026 Finlex- ja 
 ## Päätökset
 
 - Oma Worker eikä osa Finlex- tai Aluetieto-liitintä: Hilman lukurajapinnan käyttöehdot (luettu 31.10.2026) rajaavat käytön rekisteröityneeseen käyttäjään ("tarkoitettu vain rekisteröityneen Käyttäjän käyttöön", käyttöoikeutta ei saa siirtää kolmannelle, API-avaimen luovuttaminen kolmannelle on kielletty). Muut liittimet ovat avoimia.
-- Salainen polku on pakollinen (`MCP_PATH_SECRET`, vähintään 16 merkkiä). Ilman sitä Worker ei vastaa.
+- Salainen polku on pakollinen (`MCP_PATH_SECRET`, vähintään 12 merkkiä). Ilman sitä Worker ei vastaa.
 - Ei tarkoitettu Anthropicin connector-hakemistoon.
 - Tiedot hakuindeksistä (`eformnotices-v2`), jossa ovat myös osat, voittajat ja arvot. Arviointiperusteet ja sopimuskausi eForms-XML:stä.
 - Muiden julkaisemien liitinten väite CC BY 4.0 -lisenssistä ei pidä paikkaansa lukurajapinnan osalta: immateriaalioikeudet kuuluvat Hansel Oy:lle, ja tietoja saa käyttää omassa toiminnassa.
@@ -22,3 +22,4 @@ Oma Claude-liitin julkisille hankinnoille Hilmasta. Tehty 31.10.2026 Finlex- ja 
 ## Muutokset
 
 - 31.10.2026 v1.0: hae_hankintoja, hankinta.
+- 31.10.2026 v1.0.1: salaisen polun vähimmäispituus 12 merkkiä (oli 16).

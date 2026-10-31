@@ -26,7 +26,7 @@ Ilmoituksen tyypit: `ilmoitus` (hankintailmoitus), `paatos` (jälki-ilmoitus), `
 1. Hanki avain kehittäjäportaalista.
 2. Luo Worker `hilma-mcp` ja lisää salaisuudet (Settings → Variables and Secrets, tyyppi Secret):
    - `HILMA_API_KEY`: avp-read-tilauksen Primary key
-   - `MCP_PATH_SECRET`: vähintään 16 merkkiä satunnaista tekstiä
+   - `MCP_PATH_SECRET`: vähintään 12 merkkiä satunnaista tekstiä
 3. Julkaise (Workers Builds pushista main-haaraan tai `npx wrangler deploy`).
 4. Lisää Claudeen liitin osoitteella `https://hilma-mcp.<alitunnus>.workers.dev/mcp/<MCP_PATH_SECRET>`.
 

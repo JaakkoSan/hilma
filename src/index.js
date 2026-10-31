@@ -7,7 +7,7 @@
 
 import { TOOLS, callTool } from "./tools.js";
 
-const SERVER_INFO = { name: "hilma", version: "1.0.0" };
+const SERVER_INFO = { name: "hilma", version: "1.0.1" };
 const SUPPORTED_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"];
 
 const INSTRUCTIONS = `Tämä liitin hakee julkisia hankintoja Hilmasta (hankintailmoitukset.fi, Hansel Oy / valtiovarainministeriö): hankintailmoitukset, jälki-ilmoitukset voittajineen, ennakkoilmoitukset ja hankintasuunnitelmat.
@@ -21,7 +21,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     // Salainen polku on pakollinen. DEV_PATH on väliaikainen kehityspolku, joka poistetaan käyttöönoton jälkeen.
-    const paths = [env.MCP_PATH_SECRET, env.DEV_PATH].filter((p) => typeof p === "string" && p.length >= 16).map((p) => `/mcp/${p}`);
+    const paths = [env.MCP_PATH_SECRET, env.DEV_PATH].filter((p) => typeof p === "string" && p.length >= 12).map((p) => `/mcp/${p}`);
 
     if (url.pathname === "/" && request.method === "GET") {
       return new Response("Hilma MCP -palvelin. Ei julkista sisältöä.\n", {

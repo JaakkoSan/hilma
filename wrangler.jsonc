@@ -7,7 +7,7 @@
   // Pyyntöjen sisältöä ei tallenneta mihinkään. Välimuisti: Cloudflaren Cache API.
   // Pakolliset salaisuudet (Settings → Variables and Secrets tai wrangler secret put):
   //   HILMA_API_KEY    Hilman avp-read-tilauksen avain (hns-hilma-prod-apim.developer.azure-api.net)
-  //   MCP_PATH_SECRET  vähintään 16 merkkiä; liittimen osoite on /mcp/<salaisuus>
+  //   MCP_PATH_SECRET  vähintään 12 merkkiä; liittimen osoite on /mcp/<salaisuus>
   "workers_dev": true,
   // Käyttörajoitus työkalukutsuille (ks. src/index.js). period: 10 tai 60 sekuntia.
   "ratelimits": [
