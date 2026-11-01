@@ -2,6 +2,7 @@
 
 import { search, noticeXml, noticeWebUrl, HilmaError } from "./hilma.js";
 import { parseLots } from "./eforms.js";
+import { tedSearch, ml, mlList, tedWebUrl, TYPE_GROUPS, TYPE_NAMES, COUNTRIES, TedError } from "./ted.js";
 
 const MAX_OUTPUT = 50_000;
 const PAGE = 10;
@@ -43,10 +44,40 @@ export const TOOLS = [
       },
       required: ["ilmoitus"],
     },
+  },  {
+    name: "hae_eu_hankintoja",
+    description:
+      "Hakee EU-kynnysarvot ylittäviä julkisia hankintoja TED-tietokannasta (Tenders Electronic Daily, EU:n julkaisutoimisto) kaikista EU- ja ETA-maista: hankintailmoitukset, jälki-ilmoitukset voittajineen, ennakkoilmoitukset ja sopimusmuutokset. Ehdot: hakusana (ilmoituksen teksti millä tahansa kielellä), maa, ostaja, CPV-koodi, tyyppi, avoinna olevat ja julkaisupäivä. Suomen hankinnat ovat myös Hilmassa (hae_hankintoja), jossa ovat lisäksi kansalliset ilmoitukset.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        hakusana: { type: "string", description: "Sana tai sanonta ilmoituksen tekstistä, esim. \"kotihoito\" tai \"home care\"." },
+        maa: { type: "string", description: "Ostajan maa nimellä (\"Ruotsi\") tai ISO-koodilla (\"SWE\"). Valinnainen." },
+        ostaja: { type: "string", description: "Ostajan nimi tai sen osa, esim. \"Region Stockholm\". Valinnainen." },
+        cpv: { type: "string", description: "CPV-koodi, esim. \"85000000\" (terveys- ja sosiaalipalvelut); alakoodit sisältyvät. Valinnainen." },
+        tyyppi: { type: "string", enum: ["ilmoitus", "paatos", "ennakko", "muutos"], description: "ilmoitus = hankintailmoitus, paatos = jälki-ilmoitus, ennakko = ennakkoilmoitus, muutos = sopimusmuutos. Oletus: kaikki." },
+        vain_avoimet: { type: "boolean", description: "Vain ilmoitukset, joiden tarjousten määräaika ei ole mennyt." },
+        alkaen: { type: "string", description: "Julkaistu aikaisintaan (VVVV-KK-PP)." },
+        paattyen: { type: "string", description: "Julkaistu viimeistään (VVVV-KK-PP)." },
+        sivu: { type: "integer", description: "Tulossivu, 1 = ensimmäinen. Sivulla 10 tulosta, uusin ensin." },
+      },
+    },
+  },
+  {
+    name: "eu_hankinta",
+    description:
+      "Palauttaa yhden TED-ilmoituksen tiedot julkaisunumerolla (esim. 753942-2026): ostaja ja yhteystieto, kuvaus, osat, CPV-koodit, menettely, arvo, määräaika, voittajat, tarjousasiakirjojen ja tarjousten jättämisen osoitteet sekä TED-linkki.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ilmoitus: { type: "string", description: "TED-julkaisunumero, esim. \"753942-2026\"." },
+      },
+      required: ["ilmoitus"],
+    },
   },
 ];
 
-const TITLES = { hae_hankintoja: "Hae hankintoja", hankinta: "Hankintailmoitus" };
+const TITLES = { hae_hankintoja: "Hae hankintoja", hankinta: "Hankintailmoitus", hae_eu_hankintoja: "Hae EU-hankintoja (TED)", eu_hankinta: "EU-hankintailmoitus (TED)" };
 for (const t of TOOLS) {
   t.annotations = { title: TITLES[t.name], readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true };
 }
@@ -358,7 +389,119 @@ async function hankinta(args, env) {
   return clip(out.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd());
 }
 
-const HANDLERS = { hae_hankintoja: haeHankintoja, hankinta };
+// ---------- TED: EU:n hankintailmoitukset ----------
+
+const TED_SOURCE = "Lähde: TED – Tenders Electronic Daily, Euroopan unionin julkaisutoimisto (vapaa uudelleenkäyttö, komission päätös 2011/833/EU).";
+const TED_LIST_FIELDS = ["publication-number", "notice-type", "publication-date", "title-proc", "buyer-name", "buyer-country", "buyer-city", "deadline-receipt-tender-date-lot", "deadline-receipt-tender-time-lot", "estimated-value-proc", "estimated-value-cur-proc", "total-value", "total-value-cur", "winner-name", "classification-cpv", "procedure-type"];
+const TED_DETAIL_FIELDS = [...TED_LIST_FIELDS, "description-proc", "title-lot", "description-lot", "estimated-value-lot", "document-url-lot", "submission-url-lot", "organisation-email-buyer", "place-of-performance"];
+const PROC_TED = { open: "avoin menettely", restricted: "rajoitettu menettely", "neg-w-call": "neuvottelumenettely", "neg-wo-call": "suorahankinta", "comp-dial": "kilpailullinen neuvottelumenettely", innovation: "innovaatiokumppanuus", "oth-single": "muu yksivaiheinen menettely", "oth-mult": "muu monivaiheinen menettely" };
+
+const tedText = (s) => String(s).replace(/["\\()]/g, " ").replace(/\s+/g, " ").trim();
+const ymd = (iso) => iso.replace(/-/g, "");
+
+// Päivä ("2026-12-13Z" tai "2026-12-13+01:00") ja kellonaika ("21:59:00Z") Suomen aikaan.
+function tedDeadline(dates, times) {
+  const d = (dates ?? [])[0];
+  if (!d) return null;
+  const date = d.slice(0, 10);
+  const tz = d.slice(10) || "Z";
+  const t = (times ?? [])[0];
+  const time = t ? t.replace(/(Z|[+-]\d\d:\d\d)$/, "") : "23:59:59";
+  const ttz = t ? (t.match(/(Z|[+-]\d\d:\d\d)$/)?.[1] ?? tz) : tz;
+  return fiTime(`${date}T${time}${ttz === "Z" ? "Z" : ttz}`);
+}
+
+function tedEntry(n) {
+  const title = ml(n["title-proc"]) ?? "(ei otsikkoa)";
+  const lines = [`${n["publication-number"]} ${TYPE_NAMES[n["notice-type"]] ?? n["notice-type"]}: ${title}`];
+  const buyers = mlList(n["buyer-name"]);
+  const where = [mlList(n["buyer-city"])[0], (n["buyer-country"] ?? [])[0]].filter(Boolean).join(", ");
+  if (buyers.length) lines.push(`  Ostaja: ${buyers.slice(0, 3).join("; ")}${buyers.length > 3 ? ` ja ${buyers.length - 3} muuta` : ""}${where ? ` (${where})` : ""}`);
+  const facts = [];
+  if (n["publication-date"]) facts.push(`julkaistu ${fiTime(`${n["publication-date"].slice(0, 10)}T12:00:00Z`, false)}`);
+  const dl = String(n["notice-type"] ?? "").startsWith("can") ? null : tedDeadline(n["deadline-receipt-tender-date-lot"], n["deadline-receipt-tender-time-lot"]);
+  if (dl) facts.push(`määräaika ${dl}`);
+  const val = n["total-value"] ? money(Number(n["total-value"]), ml(n["total-value-cur"]) || "EUR") : n["estimated-value-proc"] ? money(Number(n["estimated-value-proc"]), ml(n["estimated-value-cur-proc"]) || "EUR") : null;
+  if (val) facts.push(`${n["total-value"] ? "arvo" : "arvioitu arvo"} ${val}`);
+  if (n["procedure-type"]) facts.push(PROC_TED[n["procedure-type"]] ?? n["procedure-type"]);
+  if (facts.length) lines.push(`  ${facts.join(", ")}`);
+  const cpv = [...new Set(n["classification-cpv"] ?? [])];
+  if (cpv.length) lines.push(`  CPV: ${cpv.slice(0, 6).join(", ")}`);
+  const w = [...new Set(mlList(n["winner-name"]))];
+  if (w.length) lines.push(`  Voittajat: ${w.length > 8 ? w.slice(0, 8).join("; ") + ` ja ${w.length - 8} muuta` : w.join("; ")}`);
+  lines.push(`  ${tedWebUrl(n["publication-number"])}`);
+  return lines;
+}
+
+async function haeEuHankintoja(args) {
+  const parts = [];
+  const q = tedText(args.hakusana ?? "");
+  if (q) parts.push(`FT~("${q}")`);
+  if (args.maa) {
+    const m = String(args.maa).trim();
+    const code = COUNTRIES[m.toLowerCase()] ?? (/^[a-z]{3}$/i.test(m) ? m.toUpperCase() : null);
+    if (!code) throw new UserError(`Tuntematon maa "${args.maa}". Anna nimi (esim. Ruotsi) tai ISO-koodi (SWE).`);
+    parts.push(`buyer-country=${code}`);
+  }
+  const buyer = tedText(args.ostaja ?? "");
+  if (buyer) parts.push(`buyer-name~("${buyer}")`);
+  const cpv = String(args.cpv ?? "").replace(/-\d$/, "").trim();
+  if (cpv) {
+    if (!/^\d{8}$/.test(cpv)) throw new UserError('Anna CPV-koodi kahdeksalla numerolla, esim. "85000000".');
+    parts.push(`classification-cpv=${cpv}`);
+  }
+  if (args.tyyppi) {
+    const g = TYPE_GROUPS[args.tyyppi];
+    if (!g) throw new UserError("tyyppi: ilmoitus, paatos, ennakko tai muutos.");
+    parts.push(`notice-type IN (${g.join(" ")})`);
+  }
+  if (args.vain_avoimet) parts.push(`deadline-receipt-tender-date-lot>=${ymd(new Date().toISOString().slice(0, 10))}`);
+  if (args.alkaen) parts.push(`publication-date>=${ymd(asDate(args.alkaen, "alkaen"))}`);
+  if (args.paattyen) parts.push(`publication-date<=${ymd(asDate(args.paattyen, "paattyen"))}`);
+  if (!parts.length) throw new UserError("Anna hakusana tai jokin rajaus (maa, ostaja, CPV, tyyppi, vain_avoimet tai päivämäärä).");
+  const page = Math.max(1, Number(args.sivu) || 1);
+  if (page > 100) throw new UserError("Sivuja voi selata enintään 100. Rajaa hakua.");
+  const r = await tedSearch(`${parts.join(" AND ")} SORT BY publication-date DESC`, TED_LIST_FIELDS, { limit: PAGE, page });
+  if (!r.notices.length) return page > 1 ? "Ei enempää tuloksia." : "Ei osumia TEDistä. Kokeile toista kieltä (esim. englanti), väljempää hakusanaa tai poista rajauksia.";
+  const out = [`TED: ${r.total} ilmoitusta (sivu ${page}, uusin ensin).`];
+  for (const n of r.notices) out.push("", ...tedEntry(n));
+  if (r.total > page * PAGE) out.push("", `Lisää tuloksia: sivu ${page + 1}.`);
+  out.push("", "Koko ilmoitus eu_hankinta-työkalulla (julkaisunumero).", TED_SOURCE);
+  return clip(out.join("\n"));
+}
+
+async function euHankinta(args) {
+  const pub = String(args.ilmoitus ?? "").trim();
+  if (!/^\d{1,8}-\d{4}$/.test(pub)) throw new UserError('Anna TED-julkaisunumero, esim. "753942-2026".');
+  const r = await tedSearch(`publication-number=${pub}`, TED_DETAIL_FIELDS, { limit: 1, ttl: 6 * 3600 });
+  const n = r.notices[0];
+  if (!n) throw new UserError(`Ilmoitusta ${pub} ei löytynyt TEDistä.`);
+  const out = tedEntry(n).map((l) => l.replace(/^ {2}/, ""));
+  const email = (n["organisation-email-buyer"] ?? [])[0];
+  if (email) out.splice(2, 0, `Ostajan yhteystieto: ${email}`);
+  const desc = ml(n["description-proc"]);
+  if (desc) out.push("", "Kuvaus:", desc.length > 4000 ? `${desc.slice(0, 4000)} …` : desc);
+  const titles = mlList(n["title-lot"]);
+  const descs = mlList(n["description-lot"]);
+  if (titles.length > 1 || (titles.length === 1 && descs[0] && descs[0] !== desc)) {
+    out.push("", `Osat (${titles.length}):`);
+    titles.slice(0, 30).forEach((t, i) => {
+      const d = descs[i] && descs[i] !== desc ? ` – ${descs[i].length > 400 ? `${descs[i].slice(0, 400)} …` : descs[i]}` : "";
+      const v = (n["estimated-value-lot"] ?? [])[i];
+      out.push(`${i + 1}. ${t}${v ? ` (arvioitu arvo ${money(Number(v), "EUR")})` : ""}${d}`);
+    });
+  }
+  const docs = [...new Set(n["document-url-lot"] ?? [])];
+  const subs = [...new Set(n["submission-url-lot"] ?? [])];
+  if (docs.length) out.push("", `Tarjousasiakirjat: ${docs.slice(0, 5).join(" ")}`);
+  if (subs.length && subs.join() !== docs.join()) out.push(`Tarjousten jättäminen: ${subs.slice(0, 5).join(" ")}`);
+  const places = [...new Set(n["place-of-performance"] ?? [])];
+  if (places.length) out.push(`Toteutuspaikka (NUTS/maa): ${places.join(", ")}`);
+  out.push("", "Määräajat ovat Suomen aikaa. Tarkista ehdot ja määräajat tarjousasiakirjoista.", TED_SOURCE);
+  return clip(out.join("\n"));
+}
+
+const HANDLERS = { hae_hankintoja: haeHankintoja, hankinta, hae_eu_hankintoja: haeEuHankintoja, eu_hankinta: euHankinta };
 
 export async function callTool(name, args = {}, env = {}) {
   const fn = HANDLERS[name];
@@ -369,7 +512,9 @@ export async function callTool(name, args = {}, env = {}) {
     const msg =
       e instanceof UserError
         ? e.message
-        : e instanceof HilmaError
+        : e instanceof TedError
+          ? `TED-haku epäonnistui: ${e.message}`
+          : e instanceof HilmaError
           ? `Hilma-haku epäonnistui: ${e.message}. Yritä hetken päästä uudelleen.`
           : `Odottamaton virhe: ${e?.message ?? e}`;
     return { isError: true, content: [{ type: "text", text: msg }] };

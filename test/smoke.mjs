@@ -31,9 +31,11 @@ check((await rpc("initialize", {}, "/mcp")).status === 404, "ilman salaista polk
 const init = await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "t", version: "0" } });
 check(init.result?.serverInfo?.name === "hilma", "initialize");
 const list = await rpc("tools/list", {});
-check(list.result?.tools?.length === 2, "tools/list (2 työkalua)");
+check(list.result?.tools?.length === 4, "tools/list (4 työkalua)");
 
 const cases = [
+  ["hae_eu_hankintoja", { hakusana: "kotihoito", maa: "Suomi" }, (t) => t.includes("TED:") && t.includes("ted.europa.eu/fi/notice")],
+  ["eu_hankinta", { ilmoitus: "755508-2026" }, (t) => t.includes("Kansaneläkelaitos") && t.includes("Voittajat")],
   ["hae_hankintoja", { hakusana: "kotihoito", tyyppi: "paatos" }, (t) => t.includes("Jälki-ilmoitus") && t.includes("hankintailmoitukset.fi/fi/public")],
   ["hae_hankintoja", { maakunta: "Kymenlaakso", vain_avoimet: true, jarjestys: "maaraaika" }, (t) => t.includes("määräaika")],
   ["hae_hankintoja", { voittaja: "1926203-5", tyyppi: "paatos" }, (t) => t.includes("1926203-5")],

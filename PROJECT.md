@@ -16,6 +16,7 @@ Oma Claude-liitin julkisille hankinnoille Hilmasta. Tehty 31.10.2026 Finlex- ja 
 - `src/index.js`: MCP-protokolla, salainen polku ja käyttörajoitus
 - `src/tools.js`: työkalujen määrittelyt ja toteutus, maakuntien NUTS-koodit
 - `src/hilma.js`: Hilman rajapinnan asiakas ja välimuisti
+- `src/ted.js`: TED-hakurajapinnan asiakas (EU:n hankintailmoitukset), ilmoitustyypit ja maakoodit
 - `src/eforms.js`: eForms-XML:n osakohtaiset tiedot (arviointiperusteet, sopimuskausi, optiot)
 - `test/smoke.mjs`: savutesti (tarvitsee HILMA_API_KEY-ympäristömuuttujan)
 
@@ -23,3 +24,4 @@ Oma Claude-liitin julkisille hankinnoille Hilmasta. Tehty 31.10.2026 Finlex- ja 
 
 - 31.10.2026 v1.0: hae_hankintoja, hankinta.
 - 31.10.2026 v1.0.1: salaisen polun vähimmäispituus 12 merkkiä (oli 16).
+- 1.11.2026 v1.1: EU-hankinnat TEDistä (hae_eu_hankintoja, eu_hankinta). TED-rajapinta ei vaadi avainta, ja ilmoitusten uudelleenkäyttö on vapaata (TED legal notice, luettu 1.11.2026). Lisätty tähän liittimeen, koska aihe on sama; TED ei itse vaadi yksityistä liitintä.
